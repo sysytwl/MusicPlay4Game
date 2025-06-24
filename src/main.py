@@ -3,7 +3,7 @@ import sys
 import os
 import time
 import json
-from mido import MidiFile, MidiFileError
+from mido import MidiFile
 import keyboard
 
 # ------------------- Admin Elevation (Windows) -------------------
@@ -60,14 +60,14 @@ def load_midi_file(path):
     try:
         mid = MidiFile(path)
         return mid
-    except (OSError, MidiFileError) as e:
+    except OSError as e:
         print(f"[!] Warning: failed to load MIDI normally: {e}")
         print("[*] Retrying with clip=True (will attempt to clip out-of-range data bytes)...")
         try:
             mid = MidiFile(path, clip=True)
             print("[+] Loaded MIDI with clip=True")
             return mid
-        except Exception as e2:
+        except OSError as e2:
             print(f"[!] Error: failed to load MIDI even with clip=True: {e2}")
             raise
 

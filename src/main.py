@@ -3,7 +3,7 @@ import sys
 import os
 import time
 import json
-from mido import MidiFile
+from mido import MidiFile, MidiFileError
 import keyboard
 
 # ------------------- Admin Elevation (Windows) -------------------
@@ -51,6 +51,26 @@ def load_keymap(file_path):
             }
     return keymap
 
+# ------------------- Load MIDI File -------------------
+def load_midi_file(path):
+    """
+    Try loading the MIDI file normally; if data-byte errors occur,
+    retry with clip=True. If still fails, raise.
+    """
+    try:
+        mid = MidiFile(path)
+        return mid
+    except (OSError, MidiFileError) as e:
+        print(f"[!] Warning: failed to load MIDI normally: {e}")
+        print("[*] Retrying with clip=True (will attempt to clip out-of-range data bytes)...")
+        try:
+            mid = MidiFile(path, clip=True)
+            print("[+] Loaded MIDI with clip=True")
+            return mid
+        except Exception as e2:
+            print(f"[!] Error: failed to load MIDI even with clip=True: {e2}")
+            raise
+
 # ------------------- Find closest mapped note -------------------
 def find_closest_note(note_int, mapped_notes):
     """
@@ -90,7 +110,12 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False):
                 pass
     mapped_notes.sort()
     print(f"[+] Playing: {midi_file}  (use_closest={'ON' if use_closest else 'OFF'})")
-    mid = MidiFile(midi_file)
+    try:
+        mid = load_midi_file(midi_file)
+    except Exception:
+        print("[!] Aborting playback due to MIDI load failure.")
+        return
+
     for msg in mid:
         time.sleep(msg.time)
         if msg.type == 'note_on' and msg.velocity > 0:

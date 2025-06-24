@@ -16,3 +16,10 @@ python ./src/main.py ./mid_music/bwv988.mid ./keymaps/keymap.json --closest
 ```bat
 python ./src/main.py
 ```
+
+# log 
+1. RBV1 rebuild v1
+2. RBV1.1 error fix:
+```txt
+The error OSError: data byte must be in range 0..127 indicates that mido encountered a byte outside the valid MIDI data range while parsing the file. Some MIDI files may contain unexpected or slightly nonstandard bytes
+```

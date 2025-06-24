@@ -1,0 +1,1 @@
+pyinstaller .\src\main.py -n MiDiConvPlayer --onefile --icon 

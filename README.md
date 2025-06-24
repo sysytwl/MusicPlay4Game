@@ -23,3 +23,8 @@ python ./src/main.py
 ```txt
 The error OSError: data byte must be in range 0..127 indicates that mido encountered a byte outside the valid MIDI data range while parsing the file. Some MIDI files may contain unexpected or slightly nonstandard bytes
 ```
+3. RBV1.2 function add:
+```txt
+window -> stop/play
+speed change
+```

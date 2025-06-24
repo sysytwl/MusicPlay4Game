@@ -1,0 +1,3 @@
+mido
+#python-rtmidi  # Optional, needed only for real MIDI I/O, not for file playback
+keyboard

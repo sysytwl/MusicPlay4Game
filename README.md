@@ -1,45 +1,18 @@
-# MUSIC-PLAYER-FOR-FINAL-FANTASY-XIV
-FINAL FANTASY XIV/最终幻想14
-沸水泡5-10分钟即可享用。
+# music player, conv mid to keys for games (ReBuildV1)
 
+> test: genshin -> working
 
-
-音乐使用 1，2，3，……  h1, h2 ,h3 ……   在规则里可以看到具体的对应方法（可以修改）
-
-节奏使用 “|” 加标准时间的倍数，如标准节奏一拍，可以什么都不加。
-
-输出文件如果选择了原有文件会在底部添加原来的东西还会存在
-
-
-
-
-
-update：
-
-0.5.7 汉化
-
-0.5 添加 lib pyqt4 实现gui界面
-
-0.4 简化，添加lib pyhook pyinput 实现键盘模拟
-
-0.3 添加循环函数
-
-0.2 bug修复：
-
-        闪退
-
-0.1 初步转换
-
-
-
-
-
-
-
-梦想：
-
-0.6 添加 dat 播放功能
-
-0.6.1 休息10天
-
-0.7 添加爬虫和Tensorflow实现寻找和五线谱识别
+# use method:
+1. install python
+2. install libs
+```bat
+pip install -r requirements.txt
+```
+3. run
+```bat
+python ./src/main.py ./mid_music/bwv988.mid ./keymaps/keymap.json --closest
+```
+4. help msg
+```bat
+python ./src/main.py
+```

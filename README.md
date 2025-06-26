@@ -2,6 +2,12 @@
 
 > test: genshin -> working
 
+# TL;DR
+open terminal and run: `file_location/MiDiConvPlayer.exe [mid file] [keymap.json]`
+> example:
+> 
+> `MiDiConvPlayer.exe ./mid_music/bwv988.mid ./keymaps/keymap.json --closest`
+
 # use method:
 1. install python
 2. install libs
@@ -27,4 +33,9 @@ The error OSError: data byte must be in range 0..127 indicates that mido encount
 ```txt
 window -> stop/play
 speed change
+```
+
+4. RBV1.3 function add:
+```txt
+Supports Simultaneous Notes
 ```

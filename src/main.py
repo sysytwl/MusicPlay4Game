@@ -114,77 +114,65 @@ def find_closest_note(note_int, mapped_notes):
 
 # ------------------- Play MIDI -------------------
 def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, focus_list=None):
-    """
-    Play the MIDI file.
-    focus_list: list of window-title substrings. Before sending each note, wait until
-                the foreground window title contains any one of these substrings.
-                If focus_list is None or empty, no focus checking is done.
-    """
-    # Prepare mapped_notes list as before...
-    mapped_notes = []
-    for k, v in keymap.items():
-        if v:
-            try:
-                mapped_notes.append(int(k))
-            except ValueError:
-                pass
-    mapped_notes.sort()
+    #import threading
 
     print(f"[+] Playing: {midi_file}  (use_closest={'ON' if use_closest else 'OFF'}, speed={speed})")
+
     try:
         mid = load_midi_file(midi_file)
     except OSError:
         print("[!] Aborting playback due to MIDI load failure.")
         return
 
+    mapped_notes = sorted(int(k) for k, v in keymap.items() if v)
+
+    # Keep track of pressed keys to avoid duplicate releases
+    active_keys = {}
+
     for msg in mid:
-        # Adjust timing by speed
-        delay = msg.time / speed if speed and speed > 0 else msg.time
-        time.sleep(max(0,delay-0.05))#keypress correction for keyboard lag
+        # Respect timing
+        if msg.time > 0:
+            time.sleep(msg.time / speed)
 
-        if msg.type == 'note_on' and msg.velocity > 0:
-            note_int = msg.note
-            note_str = str(note_int)
+        if msg.type in ['note_on', 'note_off']:
+            note = msg.note
+            note_str = str(note)
 
-            # --- Focus check: wait until any substring in focus_list matches ---
+            # Handle focus wait
             if focus_list:
                 while True:
                     title = get_foreground_window_title()
-                    # Check if any substring matches (case-insensitive)
-                    matched = False
-                    for substr in focus_list:
-                        if substr.lower() in title.lower():
-                            matched = True
-                            if verbose:
-                                print(f"[Focused] Window '{title}' matches '{substr}', proceeding with Note {note_int}")
-                            break
-                    if matched:
+                    if any(substr.lower() in title.lower() for substr in focus_list):
                         break
-                    # Not matched yet: print and wait
-                    print(f"[Waiting] Note {note_int}: current window '{title}' not in focus list; waiting...")
+                    print(f"[Waiting] Note {note}: current window '{title}' not in focus list; waiting...")
                     time.sleep(2)
 
-            # --- Mapping / replacement logic as before ---
-            mapped = keymap.get(note_str, "")
-            if mapped:
-                if verbose:
-                    print(f"Note {note_int} → Key '{mapped}'")
-                keyboard.press(mapped)
-                time.sleep(0.05)
-                keyboard.release(mapped)
-            else:
-                if use_closest and mapped_notes:
-                    closest_note = find_closest_note(note_int, mapped_notes)
-                    if closest_note is not None:
-                        key = keymap.get(str(closest_note))
-                        if key:
-                            print(f"[Replaced] Note {note_int} unmapped; using closest mapped note {closest_note} → Key '{key}'")
-                            keyboard.press(key)
-                            time.sleep(0.05)
-                            keyboard.release(key)
-                            continue
-                print(f"[Ignored] Note {note_int} has no key mapping")
+            key = keymap.get(note_str, "")
 
+            # Find replacement key if missing
+            if not key and use_closest:
+                closest_note = find_closest_note(note, mapped_notes)
+                if closest_note is not None:
+                    key = keymap.get(str(closest_note))
+                    if key:
+                        print(f"[Replaced] Note {note} unmapped; using closest mapped note {closest_note} → Key '{key}'")
+
+            if not key:
+                print(f"[Ignored] Note {note} has no key mapping")
+                continue
+
+            if msg.type == 'note_on' and msg.velocity > 0:
+                if key not in active_keys:
+                    keyboard.press(key)
+                    active_keys[key] = True
+                    if verbose:
+                        print(f"[Pressed] Note {note} → Key '{key}'")
+            else:
+                if key in active_keys:
+                    keyboard.release(key)
+                    del active_keys[key]
+                    if verbose:
+                        print(f"[Released] Note {note} → Key '{key}'")
 
 # ------------------- Main Entry -------------------
 def print_usage():

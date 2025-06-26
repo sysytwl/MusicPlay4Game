@@ -1,1 +1,1 @@
-pyinstaller .\src\main.py -n MiDiConvPlayer --onefile --icon 
+pyinstaller .\src\main.py -n MiDiConvPlayer --onefile --icon ./src/OIP.jpg

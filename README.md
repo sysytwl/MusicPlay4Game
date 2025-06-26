@@ -1,12 +1,15 @@
-# music player, conv mid to keys for games (ReBuildV1)
+# music player, conv mid to keys for games (ReBuild)
 
 > test: genshin -> working
 
 # TL;DR
-open terminal and run: `file_location/MiDiConvPlayer.exe [mid file] [keymap.json]`
-> example:
-> 
-> `MiDiConvPlayer.exe ./mid_music/bwv988.mid ./keymaps/keymap.json --closest`
+1. open terminal and run: `file_location/MiDiConvPlayer.exe [mid file] [keymap.json]`
+example:
+```terminal
+MiDiConvPlayer.exe ./mid_music/bwv988.mid ./keymaps/keymap.json --closest
+ ```
+
+2. midi web recommend: https://onlinesequencer.net/
 
 # use method:
 1. install python
@@ -37,5 +40,5 @@ speed change
 
 4. RBV1.3 function add:
 ```txt
-Supports Simultaneous Notes
+Supports Simultaneous Notes and long notes
 ```

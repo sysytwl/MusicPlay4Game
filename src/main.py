@@ -6,6 +6,19 @@ import json
 from mido import MidiFile
 import keyboard
 import ctypes
+from music21 import converter, key
+
+# ------------------- MIDI Key Detection -------------------
+def detect_midi_key(midi_path):
+    print(f"[AutoKey] Detecting key for MIDI file: {midi_path}, based on the size of the file, this may take a while...")
+    try:
+        score = converter.parse(midi_path)
+        key_obj = score.analyze('key')
+        print(f"[AutoKey] Detected key: {key_obj.tonic.name} {key_obj.mode}")
+        return key_obj
+    except Exception as e:
+        print(f"[!] Key detection failed: {e}")
+        return None
 
 # ------------------- Window focus detection (Windows) -------------------
 def get_foreground_window_title():
@@ -39,8 +52,6 @@ def run_as_admin():
     ctypes.windll.shell32.ShellExecuteW(
         None, "runas", sys.executable, f'"{script}" {params}', None, 1)
     sys.exit()
-
-run_as_admin()
 
 # ------------------- Load Keymap -------------------
 def load_keymap(file_path):
@@ -93,6 +104,11 @@ def load_midi_file(path):
             print(f"[!] Error: failed to load MIDI even with clip=True: {e2}")
             raise
 
+# ------------------- trans to C Major -------------------
+def transpose_note(note, semitone_shift):
+    new_note = note + semitone_shift
+    return max(0, min(127, new_note))  # clamp to valid MIDI range
+
 # ------------------- Find closest mapped note -------------------
 def find_closest_note(note_int, mapped_notes):
     """
@@ -113,10 +129,10 @@ def find_closest_note(note_int, mapped_notes):
     return closest
 
 # ------------------- Play MIDI -------------------
-def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, focus_list=None):
+def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, focus_list=None, transpose_offset=0):
     #import threading
 
-    print(f"[+] Playing: {midi_file}  (use_closest={'ON' if use_closest else 'OFF'}, speed={speed})")
+    print(f"[+] Playing: {midi_file}  (use_closest={'ON' if use_closest else 'OFF'}, speed={speed}), transpose_offset={transpose_offset}")
 
     try:
         mid = load_midi_file(midi_file)
@@ -127,15 +143,16 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
     mapped_notes = sorted(int(k) for k, v in keymap.items() if v)
 
     # Keep track of pressed keys to avoid duplicate releases
-    active_keys = {}
+    #active_keys = {}
 
     for msg in mid:
-        # Respect timing
-        if msg.time > 0:
-            time.sleep(msg.time / speed)
+        # Adjusted timing: sleep before release, then sleep before press
+        sleep_before = max(msg.time / speed - 0.035, 0) if msg.time > 0 else 0
+        if sleep_before > 0:
+            time.sleep(sleep_before)
 
         if msg.type in ['note_on', 'note_off']:
-            note = msg.note
+            note = transpose_note(msg.note, transpose_offset)
             note_str = str(note)
 
             # Handle focus wait
@@ -161,18 +178,20 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
                 print(f"[Ignored] Note {note} has no key mapping")
                 continue
 
-            if msg.type == 'note_on' and msg.velocity > 0:
-                if key not in active_keys:
-                    keyboard.press(key)
-                    active_keys[key] = True
-                    if verbose:
-                        print(f"[Pressed] Note {note} → Key '{key}'")
+            if msg.type == 'note_on':
+                time.sleep(0.035)
+                keyboard.press(key)
+                if verbose:
+                    print(f"[Pressed] Note {note} → Key '{key}'", end=" ")
+            elif msg.type == 'note_off':
+                keyboard.release(key)
+                if verbose:
+                    print(f"[Released] Note {note} → Key '{key}'", end=" ")
             else:
-                if key in active_keys:
-                    keyboard.release(key)
-                    del active_keys[key]
-                    if verbose:
-                        print(f"[Released] Note {note} → Key '{key}'")
+                print(f"[!] Unknown MIDI message type: {msg.type} for note {note}")
+
+            if verbose:
+                print(f" {msg.time}ms, system time: {time.time()}ms")
 
 # ------------------- Main Entry -------------------
 def print_usage():
@@ -183,10 +202,15 @@ def print_usage():
     print("  --focus <substring> : only send keys when foreground window title contains the given substring.")
     print("                       If omitted, uses all default substrings in the list.")
     print("  --list-windows    : list available default window substrings.")
-    time.sleep(5)
+    print("  --transpose <to> <from/auto> : transpose the MIDI to C major from the given key.")
+    print("'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,'A': 9, 'A#': 10, 'Bb': 10, 'B': 11,")
+    print("  --transtone <-offest value>")
+    time.sleep(10)
     sys.exit(1)
 
 if __name__ == "__main__":
+    run_as_admin()
+
     if len(sys.argv) < 3:
         print_usage()
 
@@ -199,6 +223,14 @@ if __name__ == "__main__":
 
     focus_substr = None
 
+    KEY_NAME_TO_MIDI = {
+        'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
+        'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,
+        'A': 9, 'A#': 10, 'Bb': 10, 'B': 11,
+    }
+    transpose_offset = 0
+    target_key = "C"  # Default
+    from_key = "C"  # Default
     i = 3
     while i < len(sys.argv):
         arg = sys.argv[i]
@@ -216,11 +248,11 @@ if __name__ == "__main__":
                         raise ValueError
                 except ValueError:
                     print(f"[!] Invalid speed value: {sys.argv[i+1]}. Must be a positive number.")
-                    sys.exit(1)
+                    print_usage()
                 i += 2
             else:
                 print("[!] --speed requires a numeric argument, e.g. --speed 1.5")
-                sys.exit(1)
+                print_usage()
         elif arg == "--focus":
             if i + 1 < len(sys.argv):
                 focus_substr = sys.argv[i + 1]
@@ -228,12 +260,44 @@ if __name__ == "__main__":
                 i += 2
             else:
                 print("[!] --focus requires a window title substring argument.")
-                sys.exit(1)
+                print_usage()
         elif arg == "--list-windows":
             print("Available default window substrings:")
             for substr in DEFAULT_FOCUS_LIST:
                 print(f"  '{substr}'")
             sys.exit(0)
+        elif arg == "--transpose":
+            if i + 2 < len(sys.argv):
+                target_key = sys.argv[i + 1].capitalize()
+                from_key = sys.argv[i + 2].capitalize()
+
+                if target_key not in KEY_NAME_TO_MIDI:
+                    print(f"[!] Unknown target key: {target_key}")
+                    print_usage()
+
+                if ((from_key != "Auto") and (from_key not in KEY_NAME_TO_MIDI)):
+                    print(f"[!] Unknown source key: {from_key}")
+                    print_usage()
+                # else:
+                #     # Manual shift
+                #     transpose_mode = "manual"
+                #     offset = (KEY_NAME_TO_MIDI[target_key] - KEY_NAME_TO_MIDI[from_key]) % 12
+                #     transpose_offset = offset
+                #     print(f"[Transpose] Manually shifting {from_key} → {target_key} (offset: {offset})")
+
+                i += 3
+            else:
+                print("[!] Usage: --transpose <target_key> <from_key|auto>")
+                print_usage()
+
+        elif arg == "--transtone":
+            if i + 1 < len(sys.argv):
+                transpose_offset = int(sys.argv[i + 1])
+                i += 2
+            else:
+                print("[!] Usage: --transtone <offest value>")
+                print_usage()
+
         else:
             print(f"[!] Unknown argument: {arg}")
             print_usage()
@@ -246,6 +310,35 @@ if __name__ == "__main__":
         focus_list = DEFAULT_FOCUS_LIST.copy()
         print(f"[Info] No --focus given; using default focus substrings: {focus_list}")
 
+    if from_key == "Auto":
+        key_obj = detect_midi_key(midi_file)
+        if key_obj:
+            # Normalize name (E- → Eb)
+            from_key = key_obj.tonic.name.replace("-", "b")
+            #from_key = KEY_NAME_TO_MIDI.get(tonic_name, 0)
+
+            # if key_obj.mode == "major":
+            #     transpose_offset = -root
+            #     print(f"[AutoKey] Transposing from {tonic_name} major → C major (shift: {transpose_offset})")
+            # elif key_obj.mode == "minor":
+            #     if "--minor-to-major" in sys.argv:
+            #         # Relative minor → relative major
+            #         major_tonic = (root + 3) % 12  # A minor (9) → C major (0)
+            #         transpose_offset = (KEY_NAME_TO_MIDI["C"] - major_tonic) % 12
+            #         print(f"[AutoKey] Shifting from {tonic_name} minor to C major via relative major (shift: {transpose_offset})")
+            #     else:
+            #         transpose_offset = (KEY_NAME_TO_MIDI["A"] - root) % 12
+            #         print(f"[AutoKey] Transposing from {tonic_name} minor → A minor (shift: {transpose_offset})")
+            # else:
+            #     print(f"[AutoKey] Unknown mode '{key_obj.mode}', skipping transpose.")
+            #     transpose_offset = 0
+        else:
+            print("[!] Key detection failed. Playing as-is.")
+            from_key = "C"
+
+    if not transpose_offset:
+        transpose_offset = (KEY_NAME_TO_MIDI[target_key] - KEY_NAME_TO_MIDI[from_key]) #% 12
+
     # Load keymap and call play_midi with focus_list
     keymap = load_keymap(keymap_file)
     play_midi(
@@ -254,6 +347,7 @@ if __name__ == "__main__":
         use_closest=use_closest,
         verbose=verbose_mode,
         speed=speed,
-        focus_list=focus_list
+        focus_list=focus_list,
+        transpose_offset=transpose_offset
     )
 

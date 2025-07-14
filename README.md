@@ -42,3 +42,14 @@ speed change
 ```txt
 Supports Simultaneous Notes and long notes
 ```
+
+5. RB1.4 function add:
+``` 
+transfer tone
+transfer major
+```
+bug fix:
+```
+zero intervial node, e.g. rush e, eeeeeeeeeeeeeeee
+minium time 35ms for 30fps
+```

@@ -142,14 +142,11 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
 
     mapped_notes = sorted(int(k) for k, v in keymap.items() if v)
 
-    # Keep track of pressed keys to avoid duplicate releases
-    #active_keys = {}
-
+    note_last_release_time = {}  # note: timestamp of last release
+    REPEAT_NOTE_DELAY_THRESHOLD = 0.03  # 30ms
     for msg in mid:
-        # Adjusted timing: sleep before release, then sleep before press
-        sleep_before = max(msg.time / speed - 0.035, 0) if msg.time > 0 else 0
-        if sleep_before > 0:
-            time.sleep(sleep_before)
+        if msg.time > 0:
+            time.sleep(msg.time / speed)
 
         if msg.type in ['note_on', 'note_off']:
             note = transpose_note(msg.note, transpose_offset)
@@ -168,30 +165,38 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
 
             # Find replacement key if missing
             if not key and use_closest:
-                closest_note = find_closest_note(note, mapped_notes)
-                if closest_note is not None:
-                    key = keymap.get(str(closest_note))
-                    if key:
-                        print(f"[Replaced] Note {note} unmapped; using closest mapped note {closest_note} → Key '{key}'")
+                numeric_note = int(note_str)
+                mapped_notes = sorted(int(k) for k in keymap)
+                min_note = mapped_notes[0]
+                max_note = mapped_notes[-1]
+
+                if min_note <= numeric_note <= max_note:
+                    closest_note = find_closest_note(note, mapped_notes)
+                    if closest_note is not None:
+                        key = keymap.get(str(closest_note))
+                        if key:
+                            print(f"[Replaced] Note {note} unmapped; using closest mapped note {closest_note} → Key '{key}'")
 
             if not key:
                 print(f"[Ignored] Note {note} has no key mapping")
                 continue
 
-            if msg.type == 'note_on':
-                time.sleep(0.035)
+            if msg.type == 'note_on' and msg.velocity > 0:
+                now = time.time()
+                last_release = note_last_release_time.get(note, 0)
+                if now - last_release < REPEAT_NOTE_DELAY_THRESHOLD:
+                    time.sleep(REPEAT_NOTE_DELAY_THRESHOLD-(now - last_release))
                 keyboard.press(key)
                 if verbose:
                     print(f"[Pressed] Note {note} → Key '{key}'", end=" ")
             elif msg.type == 'note_off':
                 keyboard.release(key)
+                note_last_release_time[note] = time.time()
+                keyboard.release(key)
                 if verbose:
                     print(f"[Released] Note {note} → Key '{key}'", end=" ")
             else:
                 print(f"[!] Unknown MIDI message type: {msg.type} for note {note}")
-
-            if verbose:
-                print(f" {msg.time}ms, system time: {time.time()}ms")
 
 # ------------------- Main Entry -------------------
 def print_usage():
@@ -219,7 +224,7 @@ if __name__ == "__main__":
 
     verbose_mode = False
     use_closest = False
-    speed = 1.0
+    speed = 1.1
 
     focus_substr = None
 

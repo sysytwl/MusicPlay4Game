@@ -53,3 +53,42 @@ bug fix:
 zero intervial node, e.g. rush e, eeeeeeeeeeeeeeee
 minium time 35ms for 30fps
 ```
+
+# FAQ
+
+## Q: How can I add a GUI without making the Python EXE too large (e.g. 500MB)?
+
+- **Why is the EXE so big?**  
+  Packaging Python apps (with PyInstaller, etc.) bundles the Python interpreter and all dependencies, which increases size, especially with GUI libraries (like PyQt, Tkinter, etc.).
+
+- **Advice to reduce EXE size:**
+  1. **Use a lightweight GUI library:**  
+     - `tkinter` (built-in, smallest),  
+     - `customtkinter` (modern look, still small),  
+     - Avoid PyQt/PySide unless you need advanced features.
+  2. **Minimize dependencies:**  
+     - Remove unused packages from your project and requirements.
+  3. **PyInstaller options:**  
+     - Use `--onefile` and `--noconsole` for a single EXE.  
+     - Use `--exclude-module` to skip unused modules.
+     - Use UPX (if available) to compress binaries: `pyinstaller --onefile --upx-dir=upx_folder ...`
+  4. **Consider a web-based GUI:**  
+     - Use `flask` or `fastapi` + `HTML/JS` for a browser-based interface.  
+     - This keeps the EXE smaller and more portable.
+  5. **Distribute as a Python script:**  
+     - If possible, ask users to install Python and run the script directly.
+
+- **Typical EXE sizes:**  
+  - Minimal Tkinter GUI: ~30-60MB  
+  - PyQt/PySide: 100MB+  
+  - Web UI (Flask): ~30-60MB
+
+- **Summary:**  
+  For smallest EXE, use Tkinter, minimize dependencies, and use PyInstaller with UPX.
+
+## Q: For Web UI, does that mean I need to open localhost:80 at runtime?
+
+- Yes, a web-based GUI means your Python app will start a local web server (e.g., on `localhost:5000` or `localhost:80`).
+- You interact with the app by opening a browser and visiting the local address (e.g., `http://localhost:5000`).
+- You can choose the port (80, 5000, 8080, etc.) in your code. Port 80 may require admin rights; 5000/8080 are common defaults.
+- The web server only runs on your computer (not public), unless you configure it otherwise.

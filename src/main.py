@@ -130,7 +130,6 @@ def find_closest_note(note_int, mapped_notes):
 
 # ------------------- Play MIDI -------------------
 def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, focus_list=None, transpose_offset=0):
-    #import threading
 
     print(f"[+] Playing: {midi_file}  (use_closest={'ON' if use_closest else 'OFF'}, speed={speed}), transpose_offset={transpose_offset}")
 
@@ -143,7 +142,8 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
     mapped_notes = sorted(int(k) for k, v in keymap.items() if v)
 
     note_last_release_time = {}  # note: timestamp of last release
-    REPEAT_NOTE_DELAY_THRESHOLD = 0.03  # 30ms
+    pressed_keys = {}
+    REPEAT_NOTE_DELAY_THRESHOLD = 0.034 # 30ms
     for msg in mid:
         if msg.time > 0:
             time.sleep(msg.time / speed)
@@ -182,16 +182,26 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
                 continue
 
             if msg.type == 'note_on' and msg.velocity > 0:
+                # If the key was not released (e.g. overlapping note), release it first
+                if pressed_keys.get(note, False):
+                    print(f"[!] Note {note} was still pressed. Releasing before re-press.")
+                    keyboard.release(key)
+                    note_last_release_time[note] = time.time()
+                    pressed_keys[note] = False
                 now = time.time()
                 last_release = note_last_release_time.get(note, 0)
-                if now - last_release < REPEAT_NOTE_DELAY_THRESHOLD:
-                    time.sleep(REPEAT_NOTE_DELAY_THRESHOLD-(now - last_release))
+                interval = now - last_release
+                #print(f"[Info] Note {note} pressed, last release at {last_release:.3f}, interval: {interval:.3f}s")
+                if interval < REPEAT_NOTE_DELAY_THRESHOLD:
+                    print(f"[!] Note {note} pressed too quickly after release ({interval:.3f}s), sleep {REPEAT_NOTE_DELAY_THRESHOLD - interval} to avoid rapid repeat.")
+                    time.sleep(REPEAT_NOTE_DELAY_THRESHOLD - interval)  # Wait to avoid rapid repeat
+                pressed_keys[note] = True
                 keyboard.press(key)
                 if verbose:
                     print(f"[Pressed] Note {note} → Key '{key}'", end=" ")
             elif msg.type == 'note_off':
-                keyboard.release(key)
                 note_last_release_time[note] = time.time()
+                pressed_keys[note] = False
                 keyboard.release(key)
                 if verbose:
                     print(f"[Released] Note {note} → Key '{key}'", end=" ")
@@ -224,7 +234,7 @@ if __name__ == "__main__":
 
     verbose_mode = False
     use_closest = False
-    speed = 1.1
+    speed = 1.0
 
     focus_substr = None
 

@@ -54,6 +54,10 @@ zero intervial node, e.g. rush e, eeeeeeeeeeeeeeee
 minium time 35ms for 30fps
 ```
 
+6. 1.5&1.6
+解决停顿感问题
+解决重叠（按下没放开，又按下）
+
 # FAQ
 
 ## Q: How can I add a GUI without making the Python EXE too large (e.g. 500MB)?

@@ -58,6 +58,9 @@ minium time 35ms for 30fps
 解决停顿感问题
 解决重叠（按下没放开，又按下）
 
+7. better auto midi key detect, fix to major for most case
+better log info on intervial sleep
+
 # FAQ
 
 ## Q: How can I add a GUI without making the Python EXE too large (e.g. 500MB)?

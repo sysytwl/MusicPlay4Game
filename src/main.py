@@ -10,12 +10,22 @@ from music21 import converter, key
 
 # ------------------- MIDI Key Detection -------------------
 def detect_midi_key(midi_path):
-    print(f"[AutoKey] Detecting key for MIDI file: {midi_path}, based on the size of the file, this may take a while...")
+    print(f"[AutoKey] Detecting key for MIDI file: {midi_path}, this may take a while...")
     try:
         score = converter.parse(midi_path)
-        key_obj = score.analyze('key')
-        print(f"[AutoKey] Detected key: {key_obj.tonic.name} {key_obj.mode}")
-        return key_obj
+        primary_key = score.analyze('key')
+
+        # Filter for major keys from alternate interpretations
+        major_candidates = [k for k in primary_key.alternateInterpretations if k.mode == 'major']
+        
+        if major_candidates:
+            best_major = max(major_candidates, key=lambda k: k.correlationCoefficient)
+            print(f"[AutoKey] Selected major key: {best_major.tonic.name} {best_major.mode}")
+            return best_major
+        else:
+            # Fall back to primary detection if no major candidate
+            print(f"[AutoKey] No strong major key detected. Defaulting to: {primary_key.tonic.name} {primary_key.mode}")
+            return primary_key
     except Exception as e:
         print(f"[!] Key detection failed: {e}")
         return None
@@ -143,7 +153,7 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
 
     note_last_release_time = {}  # note: timestamp of last release
     pressed_keys = {}
-    REPEAT_NOTE_DELAY_THRESHOLD = 0.034 # 30ms
+    REPEAT_NOTE_DELAY_THRESHOLD = 0.0333 # 30ms
     for msg in mid:
         if msg.time > 0:
             time.sleep(msg.time / speed)
@@ -193,7 +203,7 @@ def play_midi(midi_file, keymap, use_closest=False, verbose=False, speed=1.0, fo
                 interval = now - last_release
                 #print(f"[Info] Note {note} pressed, last release at {last_release:.3f}, interval: {interval:.3f}s")
                 if interval < REPEAT_NOTE_DELAY_THRESHOLD:
-                    print(f"[!] Note {note} pressed too quickly after release ({interval:.3f}s), sleep {REPEAT_NOTE_DELAY_THRESHOLD - interval} to avoid rapid repeat.")
+                    print(f"[Sleep] Note {note} interval: ({interval:.3f}s), sleep: {(REPEAT_NOTE_DELAY_THRESHOLD - interval):.3f}s")
                     time.sleep(REPEAT_NOTE_DELAY_THRESHOLD - interval)  # Wait to avoid rapid repeat
                 pressed_keys[note] = True
                 keyboard.press(key)
